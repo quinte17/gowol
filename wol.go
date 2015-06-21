@@ -5,23 +5,24 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"log"
+	"io"
+	"strings"
 )
 
 const (
-	BRDIP = "192.168.0.255"
+	CFGNAME = "gowol.json"
 )
 
+type Host struct {
+	Name, Mac, Broadcast string
+}
+
 var (
-	mactab = map[string]string{
-		"bebop.l": "70:5A:B6:94:8F:59",
-		"gamer.l": "00:25:22:f4:0b:0e",
-		"lore.l":  "00:40:ca:6d:16:07",
-		"nox.l":   "00:40:63:D5:8B:65",
-		"rpi.l":   "B8:27:EB:0D:EB:01",
-	}
 	payload []byte
 )
 
@@ -45,29 +46,37 @@ func makepayload(mac string) bool {
 	return true
 }
 
-func main() {
-	var addr string
-
+func init() {
+	// initialize payload
 	payload = make([]byte, 102)
 	for i := 0; i < 6; i++ {
 		payload[i] = 255
 	}
+}
 
-	target, _ := net.ResolveUDPAddr("udp", BRDIP+":9")
+func wakeup(mac, broadcast string) {
+	target, _ := net.ResolveUDPAddr("udp", broadcast+":9")
 	sock, _ := net.DialUDP("udp", nil, target)
 
-	for i := 1; i < len(os.Args); i++ {
-		if val, present := mactab[os.Args[i]]; present {
-			addr = val
-		} else {
-			addr = os.Args[i]
+	if !makepayload(mac) {
+		log.Fatal("mac parse error:", mac)
+	}
+	sock.Write(payload)
+}
+
+func main() {
+	cfgfile, _ := os.Open(CFGNAME)
+	dec := json.NewDecoder(cfgfile)
+	for {
+		var host Host
+		if err := dec.Decode(&host); err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
 		}
-		if !makepayload(addr) {
-			fmt.Printf("%s: parse error!\n", os.Args[i])
-		} else {
-			for x := 0; x < 3; x++ {
-				sock.Write(payload)
-			}
+		if strings.ToLower(host.Name) == strings.ToLower(os.Args[1]) {
+			fmt.Println("waking up", host.Name, host.Mac, host.Broadcast)
+			wakeup(host.Mac, host.Broadcast)
 		}
 	}
 }
