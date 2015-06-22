@@ -7,10 +7,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"os"
-	"log"
-	"io"
+	"os/user"
 	"strings"
 )
 
@@ -65,7 +66,11 @@ func wakeup(mac, broadcast string) {
 }
 
 func main() {
-	cfgfile, _ := os.Open(CFGNAME)
+	usr, _ := user.Current()
+	cfgfile, err := os.Open(usr.HomeDir + "/" + CFGNAME)
+	if err != nil {
+		log.Fatal(err)
+	}
 	dec := json.NewDecoder(cfgfile)
 	for {
 		var host Host
