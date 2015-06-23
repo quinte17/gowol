@@ -6,12 +6,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
 	"os/user"
+	"regexp"
 	"strings"
 )
 
@@ -23,45 +25,48 @@ type Host struct {
 	Name, Mac, Broadcast string
 }
 
-var (
-	payload []byte
-)
-
-func makepayload(mac string) bool {
-	var x byte
-
-	if len(mac) != 17 {
-		return false
+func mactobyte(mac string) ([]byte, error) {
+	var validateMac = regexp.MustCompile(`^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$`)
+	if !validateMac.MatchString(mac) {
+		return nil, errors.New("invalid mac-address.")
 	}
 
-	for i := 0; i < 6; i++ {
-		_, err := fmt.Sscanf(mac[3*i:3*i+2], "%2X", &x)
-		if err != nil {
-			return false
-		}
-		for c := 0; c < 16; c++ {
-			payload[6*c+6+i] = x
-		}
-	}
+	var x []byte
+	x = make([]byte, 6)
+	fmt.Sscanf(mac, "%2X:%2X:%2X:%2X:%2X:%2X", &x[0], &x[1], &x[2], &x[3], &x[4], &x[5])
 
-	return true
+	return x, nil
 }
 
-func init() {
-	// initialize payload
-	payload = make([]byte, 102)
+func makepayload(mac string) ([]byte, error) {
+	var payload []byte
+
+	bytemac, err := mactobyte(mac)
+	if err != nil {
+		return nil, err
+	}
+
+	payload = make([]byte, 6)
 	for i := 0; i < 6; i++ {
 		payload[i] = 255
 	}
+
+	for i := 0; i < 16; i++ {
+		payload = append(payload, bytemac...)
+	}
+
+	return payload, nil
 }
 
 func wakeup(mac, broadcast string) {
 	target, _ := net.ResolveUDPAddr("udp", broadcast+":9")
 	sock, _ := net.DialUDP("udp", nil, target)
 
-	if !makepayload(mac) {
-		log.Fatal("mac parse error:", mac)
+	payload, err := makepayload(mac)
+	if err != nil {
+		log.Fatal(err)
 	}
+
 	sock.Write(payload)
 }
 
