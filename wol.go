@@ -25,17 +25,13 @@ type Host struct {
 	Name, Mac, Broadcast string
 }
 
-func mactobyte(mac string) ([]byte, error) {
+func mactobyte(mac string) (net.HardwareAddr, error) {
 	var validateMac = regexp.MustCompile(`^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$`)
 	if !validateMac.MatchString(mac) {
 		return nil, errors.New("invalid mac-address.")
 	}
 
-	var x []byte
-	x = make([]byte, 6)
-	fmt.Sscanf(mac, "%2X:%2X:%2X:%2X:%2X:%2X", &x[0], &x[1], &x[2], &x[3], &x[4], &x[5])
-
-	return x, nil
+	return net.ParseMAC(mac)
 }
 
 func makepayload(mac string) ([]byte, error) {
