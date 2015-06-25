@@ -72,8 +72,15 @@ func wakeup(mac, broadcast string) {
 
 func main() {
 	usr, _ := user.Current()
-	cfgfile, err := os.Open(usr.HomeDir + "/" + CFGNAME)
-	if err != nil {
+	cfgfilename := usr.HomeDir + "/" + CFGNAME
+	cfgfile, err := os.Open(cfgfilename)
+	if os.IsNotExist(err) {
+		// create the file and open it.
+		cfgfile, err = os.Create(cfgfilename)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if err != nil {
 		log.Fatal(err)
 	}
 	dec := json.NewDecoder(cfgfile)
